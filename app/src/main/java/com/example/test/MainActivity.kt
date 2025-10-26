@@ -1,12 +1,10 @@
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -24,8 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
-
-data class Follower(val id: Int, val name: String, val isFollowingInitial: Boolean)
+data class Follower(val id: Int, val name: String, var isFollowing: Boolean)
 data class Story(val id: Int, val name: String)
 
 val sampleFollowers = listOf(
@@ -44,19 +41,13 @@ val sampleStories = listOf(
 )
 
 @Composable
-fun FollowerItem(follower: Follower, onFollowToggle: (Int, Boolean) -> Unit) {
-    var isFollowing by rememberSaveable { mutableStateOf(follower.isFollowingInitial) }
-
-    val onButtonClick = {
-        val newFollowingState = !isFollowing
-        isFollowing = newFollowingState
-        onFollowToggle(follower.id, newFollowingState)
-    }
-
+fun FollowerItem(
+    follower: Follower,
+    onFollowToggle: (Int, Boolean) -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable {  }
             .padding(vertical = 8.dp, horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -84,27 +75,30 @@ fun FollowerItem(follower: Follower, onFollowToggle: (Int, Boolean) -> Unit) {
         }
 
         Button(
-            onClick = onButtonClick,
+            onClick = {
+                onFollowToggle(follower.id, !follower.isFollowing)
+            },
             colors = ButtonDefaults.buttonColors(
-                containerColor = if (isFollowing) Color.Gray else Color(0xFF1E88E5)
+                containerColor = if (follower.isFollowing) Color(0xFFE57373) else Color(0xFF1E88E5)
             ),
-            modifier = Modifier.width(90.dp).height(32.dp),
+            modifier = Modifier
+                .width(100.dp)
+                .height(32.dp),
             contentPadding = PaddingValues(0.dp)
         ) {
             Text(
-                if (isFollowing) "Following" else "Follow",
-                fontSize = 12.sp
+                if (follower.isFollowing) "Unfollow" else "Follow",
+                fontSize = 12.sp,
+                color = Color.White
             )
         }
     }
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileCardScreen() {
     val spacing = 16.dp
-    val avatarSize = 96.dp
 
     var isFollowing by rememberSaveable { mutableStateOf(false) }
     var followerCount by rememberSaveable { mutableStateOf(1000) }
@@ -116,17 +110,44 @@ fun ProfileCardScreen() {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    val followers = remember { mutableStateListOf(*sampleFollowers.toTypedArray()) }
+    var followersState by remember { mutableStateOf(sampleFollowers) }
 
     val onFollowToggle: (Int, Boolean) -> Unit = { id, newFollowingState ->
-        val index = followers.indexOfFirst { it.id == id }
-        if (index != -1) {
-            followers[index] = followers[index].copy(isFollowingInitial = newFollowingState)
+        val followerName = followersState.find { it.id == id }?.name ?: "Unknown"
 
-            scope.launch {
-                val followerName = followers[index].name
-                val message = if (newFollowingState) "You started following $followerName" else "You unfollowed $followerName"
-                snackbarHostState.showSnackbar(message)
+        val updatedFollowers = followersState.map { follower ->
+            if (follower.id == id) {
+                follower.copy(isFollowing = newFollowingState)
+            } else {
+                follower
+            }
+        }
+        followersState = updatedFollowers
+
+        scope.launch {
+            if (newFollowingState) {
+                snackbarHostState.showSnackbar(
+                    message = "You started following $followerName",
+                    duration = SnackbarDuration.Short
+                )
+            } else {
+                val result = snackbarHostState.showSnackbar(
+                    message = "Unfollowed $followerName",
+                    actionLabel = "UNDO",
+                    withDismissAction = true,
+                    duration = SnackbarDuration.Long
+                )
+
+                if (result == SnackbarResult.ActionPerformed) {
+                    followersState = followersState.map { follower ->
+                        if (follower.id == id) {
+                            follower.copy(isFollowing = true)
+                        } else {
+                            follower
+                        }
+                    }
+                    snackbarHostState.showSnackbar("Follow restored for $followerName", duration = SnackbarDuration.Short)
+                }
             }
         }
     }
@@ -193,7 +214,7 @@ fun ProfileCardScreen() {
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(avatarSize)
+                                    .size(96.dp)
                                     .clip(CircleShape)
                                     .background(Color.LightGray.copy(alpha = 0.5f)),
                                 contentAlignment = Alignment.Center
@@ -262,7 +283,7 @@ fun ProfileCardScreen() {
 
             item {
                 Text(
-                    text = "Followers (${followers.size})",
+                    text = "Followers (${followersState.filter { it.isFollowing }.size})",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
@@ -272,7 +293,7 @@ fun ProfileCardScreen() {
                 )
             }
 
-            items(followers, key = { it.id }) { follower ->
+            items(followersState, key = { it.id }) { follower ->
                 FollowerItem(follower, onFollowToggle)
                 Divider(
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -280,6 +301,7 @@ fun ProfileCardScreen() {
                 )
             }
         }
+
         if (showUnfollowDialog) {
             AlertDialog(
                 onDismissRequest = { showUnfollowDialog = false },
@@ -290,6 +312,9 @@ fun ProfileCardScreen() {
                         isFollowing = false
                         followerCount--
                         showUnfollowDialog = false
+                        scope.launch {
+                            snackbarHostState.showSnackbar("You unfollowed Nurgalym!")
+                        }
                     }) {
                         Text("Yes", color = Color(0xFFE57373))
                     }
