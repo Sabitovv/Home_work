@@ -199,7 +199,7 @@ fun ProfileCardContent(
                 Button(
                     onClick = onRefresh,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f) // Более мягкий цвет
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
                     )
                 ) {
                     Text("Refresh")
@@ -295,7 +295,7 @@ fun ProfileHeader(state: ProfileUiState, onToggleFollow: () -> Unit) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        val buttonColor = if (state.isFollowingMainUser) Color(0xFF9E9E9E) else MaterialTheme.colorScheme.primary // Серый цвет для Unfollow
+        val buttonColor = if (state.isFollowingMainUser) Color(0xFF9E9E9E) else MaterialTheme.colorScheme.primary
 
         Button(
             onClick = onToggleFollow,
