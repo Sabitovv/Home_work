@@ -1,5 +1,5 @@
 
-package com.example.test
+package com.example.test.test
 
 import com.example.test.data.UserEntity
 import retrofit2.http.GET

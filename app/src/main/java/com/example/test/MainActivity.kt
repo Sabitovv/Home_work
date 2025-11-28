@@ -4,12 +4,20 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -17,17 +25,20 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.graphics.Brush
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.Room
-import com.example.test.data.AppDatabase
 import com.example.test.repository.Follower
 import com.example.test.ui.*
 import dagger.hilt.android.AndroidEntryPoint
@@ -166,83 +177,265 @@ fun ProfileCardContent(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Profile") },
-                actions = {
-                    Button(onClick = onRefresh) {
-                        Text("Refresh")
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = { /* Handle back press */ }) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(bottom = 16.dp),
         ) {
-            ProfileHeader(state = state, onToggleFollow = onToggleMainUserFollow)
-            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                IconButton(onClick = {  }) {
+                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                }
+                Text("Profile", style = MaterialTheme.typography.titleLarge)
+                Button(
+                    onClick = onRefresh,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f) // Более мягкий цвет
+                    )
+                ) {
+                    Text("Refresh")
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                ProfileHeader(state = state, onToggleFollow = onToggleMainUserFollow)
+                Spacer(modifier = Modifier.height(32.dp))
 
-            FollowersList(
-                followers = state.followersList,
-                onFollowToggle = onToggleFollowerFollow
-            )
+                FollowersList(
+                    followers = state.followersList,
+                    onFollowToggle = onToggleFollowerFollow
+                )
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-            Text(
-                text = "Close frends Room.",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+                val fadeInAlpha by animateFloatAsState(
+                    targetValue = if (state.isLoading) 0f else 1f,
+                    animationSpec = tween(800)
+                )
+
+                Text(
+                    text = "Close friends Room.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 4.dp)
+                        .alpha(fadeInAlpha)
+                )
+            }
             Text(
                 text = "Followers: ${state.followersList.size}",
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 8.dp),
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
 }
 @Composable
 fun ProfileHeader(state: ProfileUiState, onToggleFollow: () -> Unit) {
+
+    val scale by animateFloatAsState(
+        targetValue = if (state.isLoading) 1.2f else 1f,
+        animationSpec = tween(600)
+    )
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(
-            Icons.Filled.Person, "Profile",
-            modifier = Modifier.size(96.dp).clip(CircleShape).background(Color.LightGray).padding(16.dp)
+
+        Box(
+            modifier = Modifier
+                .graphicsLayer(scaleX = scale, scaleY = scale)
+        ) {
+
+            Icon(
+                Icons.Filled.Person,
+                contentDescription = "Profile",
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE0E0E0))
+                    .padding(16.dp),
+                tint = Color.DarkGray
+            )
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 6.dp, y = 6.dp)
+            ) {
+                OnlineIndicator()
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(state.name, style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold))
+        Text(
+            state.bio,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.Gray.copy(alpha = 0.8f)
         )
-        Text(state.name, style = MaterialTheme.typography.headlineMedium)
-        Text(state.bio, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        val buttonColor by animateColorAsState(if (state.isFollowingMainUser) Color.Gray else MaterialTheme.colorScheme.primary)
-        Button(onClick = onToggleFollow, colors = ButtonDefaults.buttonColors(containerColor = buttonColor)) {
-            Text(if (state.isFollowingMainUser) "Unfollow" else "Follow")
+        val buttonColor = if (state.isFollowingMainUser) Color(0xFF9E9E9E) else MaterialTheme.colorScheme.primary // Серый цвет для Unfollow
+
+        Button(
+            onClick = onToggleFollow,
+            colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
+            shape = RoundedCornerShape(20.dp),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+        ) {
+            Text(if (state.isFollowingMainUser) "Unfollow" else "Follow", color = Color.White)
         }
     }
 }
 
 @Composable
-fun FollowersList(followers: List<Follower>, onFollowToggle: (Int, Boolean) -> Unit) {
+fun OnlineIndicator() {
+    val infinite = rememberInfiniteTransition()
+
+    val scale by infinite.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(
+            tween(800),
+            RepeatMode.Reverse
+        )
+    )
+
+    Box(
+        modifier = Modifier
+            .size(14.dp)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
+            .background(Color.Green, CircleShape)
+    )
+}
+
+
+
+
+
+@Composable
+fun FollowersList(
+    followers: List<Follower>,
+    onFollowToggle: (Int, Boolean) -> Unit
+) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text("Suggested Followers", style = MaterialTheme.typography.titleMedium)
-        Spacer(modifier = Modifier.height(8.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(followers) { follower ->
-                FollowerItem(follower, onFollowToggle)
+        Text(
+            "Suggested Followers",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(horizontal = 0.dp)
+        ) {
+            items(followers.take(2)) { follower ->
+                AnimatedFollowerItem(follower, onFollowToggle)
             }
         }
     }
 }
+
+@Composable
+fun AnimatedFollowerItem(
+    follower: Follower,
+    onFollowToggle: (Int, Boolean) -> Unit
+) {
+    val offsetX = remember { androidx.compose.animation.core.Animatable(300f) }
+
+    LaunchedEffect(follower.id) {
+        offsetX.animateTo(
+            targetValue = 0f,
+            animationSpec = spring(
+                dampingRatio = 0.4f,
+                stiffness = 200f
+            )
+        )
+    }
+
+    val cardBackgroundColor = Color(0xFFF3EDF7)
+    val followButtonColor = Color(0xFF6750A4)
+
+    val unfollowButtonColor = Color(0xFF9E9E9E)
+    Card(
+        modifier = Modifier
+            .offset { IntOffset(offsetX.value.toInt(), 0) }
+            .width(140.dp)
+            .height(160.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = cardBackgroundColor
+        ),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Icon(
+                Icons.Filled.Person,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE0E0E0))
+                    .padding(8.dp),
+                tint = Color.DarkGray
+            )
+            Text(
+                follower.name,
+                maxLines = 1,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+            Button(
+                onClick = { onFollowToggle(follower.id, !follower.isFollowing) },
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth().height(36.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (follower.isFollowing) unfollowButtonColor else followButtonColor
+                ),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) {
+                Text(
+                    if (follower.isFollowing) "Unfollow" else "Follow",
+                    fontSize = 12.sp,
+                    color = Color.White
+                )
+            }
+        }
+    }
+}
+
+fun bounceSpring() = spring<Float>(
+    dampingRatio = 0.2f,
+    stiffness = 80f
+)
+
 
 @Composable
 fun FollowerItem(follower: Follower, onFollowToggle: (Int, Boolean) -> Unit) {
@@ -302,12 +495,12 @@ fun PreviewProfileCardContent() {
     MaterialTheme {
         ProfileCardContent(
             state = mockState,
-            onToggleMainUserFollow = { /* no-op */ },
-            onToggleFollowerFollow = { _, _ -> /* no-op */ },
-            onConfirmUnfollow = { /* no-op */ },
-            onRefresh = { /* no-op */ },
+            onToggleMainUserFollow = {  },
+            onToggleFollowerFollow = { _, _ ->},
+            onConfirmUnfollow = {},
+            onRefresh = {  },
             showUnfollowDialog = false,
-            onDismissUnfollowDialog = { /* no-op */ },
+            onDismissUnfollowDialog = { },
             snackbarHostState = dummySnackbarHostState
         )
     }

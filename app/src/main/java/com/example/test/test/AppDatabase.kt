@@ -5,9 +5,9 @@ package com.example.test
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.example.test.data.UserEntity
-import com.example.test.data.FollowerEntity
-import com.example.test.data.ProfileDao
-import com.example.test.data.StoryEntity
+import com.example.test.data.entities.FollowerEntity
+import com.example.test.data.entities.ProfileDao
+import com.example.test.data.entities.StoryEntity
 
 @Database(
     entities = [UserEntity::class, FollowerEntity::class, StoryEntity::class],

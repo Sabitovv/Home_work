@@ -1,7 +1,10 @@
 package com.example.test.repository
 
 import com.example.test.ProfileUiState
-import com.example.test.data.*
+import com.example.test.data.ApiService
+import com.example.test.data.UserEntity
+import com.example.test.data.entities.FollowerEntity
+import com.example.test.data.entities.ProfileDao
 import javax.inject.Inject
 
 data class Follower(val id: Int, val name: String, val isFollowing: Boolean)
@@ -10,64 +13,64 @@ class ProfileRepository @Inject constructor(
     private val dao: ProfileDao,
     private val api: ApiService
 ) {
+
     suspend fun loadInitialData(): ProfileUiState {
         val user = dao.getUser()
         val followers = dao.getFollowers()
 
         return if (user != null) {
+
             ProfileUiState(
                 name = user.name,
-                bio = user.bio,
-                followerCount = user.followerCount,
-                isFollowingMainUser = user.isFollowingMainUser,
-                followersList = followers.map { Follower(it.id, it.name, it.isFollowing) }
+
+                bio = "Email: ${user.email}",
+                followerCount = followers.size,
+                isFollowingMainUser = (user.id % 2 == 0),
+                followersList = followers.map { follower ->
+                    Follower(follower.id, follower.name, follower.isFollowing)
+                }
             )
         } else {
-            ProfileUiState(followersList = emptyList())
+            ProfileUiState()
         }
     }
 
+
     suspend fun refreshFromApi() {
         try {
-            val apiUsers = api.getUsers()
-            dao.insertFollowers(apiUsers.take(7).map { FollowerEntity(it.id, it.name, false) })
-            dao.insertStories(apiUsers.take(8).map { StoryEntity(it.id, "S${it.id}") })
+            val apiUser = api.getUser(1)
+            val mockFollowers = listOf(
+                FollowerEntity(101, "follower_one", false),
+                FollowerEntity(102, "follower_two", true)
+            )
+            dao.insertFollowers(mockFollowers)
 
-            val existing = dao.getUser()
-            if (existing == null) {
-                dao.insertUser(
-                    UserEntity(
-                        id = 1, name = "Nurgalym", bio = "Android learner",
-                        followerCount = 1200, isFollowingMainUser = false
-                    )
-                )
+            val existingUser = dao.getUser()
+            if (existingUser == null || existingUser.id != apiUser.id) {
+                dao.insertUser(apiUser)
             }
+
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
     suspend fun saveState(state: ProfileUiState) {
-        dao.insertUser(
-            UserEntity(
-                id = 1, name = state.name, bio = state.bio,
-                followerCount = state.followerCount, isFollowingMainUser = state.isFollowingMainUser
-            )
+        val userToSave = UserEntity(
+            id = 1,
+            name = state.name,
+            bio = state.bio,
+            username = state.name.replace(" ", "").toLowerCase(),
+            email = state.bio,
+            followerCount = state.followerCount,
+            isFollowingMainUser = state.isFollowingMainUser
         )
+        dao.insertUser(userToSave)
+
         dao.insertFollowers(
-            state.followersList.map { FollowerEntity(it.id, it.name, it.isFollowing) }
+            state.followersList.map { follower ->
+                FollowerEntity(follower.id, follower.name, follower.isFollowing)
+            }
         )
     }
-
-//    suspend fun saveState(state: com.example.test.ui.ProfileUiState) {
-//        dao.insertUser(
-//            UserEntity(
-//                id = 1, name = state.name, bio = state.bio,
-//                followerCount = state.followerCount, isFollowingMainUser = state.isFollowingMainUser
-//            )
-//        )
-//        dao.insertFollowers(
-//            state.followersList.map { FollowerEntity(it.id, it.name, it.isFollowing) }
-//        )
-//    }
 }

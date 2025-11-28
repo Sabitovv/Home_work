@@ -1,10 +1,9 @@
-
 package com.example.test.di
 
 import android.content.Context
 import androidx.room.Room
-import com.example.test.AppDatabase
-import com.example.test.data.ProfileDao
+import com.example.test.data.entities.AppDatabase
+import com.example.test.data.entities.ProfileDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -28,6 +27,6 @@ object DatabaseModule {
 
     @Provides
     fun provideProfileDao(appDatabase: AppDatabase): ProfileDao {
-        return appDatabase.dao()
+        return appDatabase.profileDao()
     }
 }
