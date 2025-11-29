@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.animateColorAsState
+import coil.compose.AsyncImage
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -11,6 +12,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,7 +20,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,6 +44,9 @@ import com.example.test.repository.Follower
 import com.example.test.ui.*
 import dagger.hilt.android.AndroidEntryPoint
 import com.example.test.ui.theme.ProfileViewModel
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -105,14 +109,16 @@ fun PostItem(post: Post, onLike: () -> Unit) {
     Card(elevation = CardDefaults.cardElevation(4.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Person, null, modifier = Modifier.clip(CircleShape).background(Color.LightGray))
+                Icon(Icons.Default.Person, null, modifier = Modifier
+                    .clip(CircleShape)
+                    .background(Color.LightGray))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(post.username, fontWeight = FontWeight.Bold)
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(post.content)
             Spacer(modifier = Modifier.height(8.dp))
-            Divider()
+            HorizontalDivider()
             TextButton(onClick = onLike) {
                 Icon(
                     if (post.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
@@ -125,6 +131,7 @@ fun PostItem(post: Post, onLike: () -> Unit) {
         }
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileCardScreen(viewModel: com.example.test.ui.theme.ProfileViewModel = hiltViewModel()) {
@@ -157,6 +164,9 @@ fun ProfileCardContent(
     onDismissUnfollowDialog: () -> Unit,
     snackbarHostState: SnackbarHostState
 ) {
+    val recompositionCounter = remember { mutableIntStateOf(0) }
+    SideEffect { recompositionCounter.intValue++ }
+
     if (showUnfollowDialog) {
         AlertDialog(
             onDismissRequest = onDismissUnfollowDialog,
@@ -185,6 +195,13 @@ fun ProfileCardContent(
                 .fillMaxSize()
                 .padding(bottom = 16.dp),
         ) {
+            Text(
+                text = "Recompositions: ${recompositionCounter.intValue}",
+                color = Color.Red,
+                modifier = Modifier.padding(8.dp),
+                fontSize = 12.sp
+            )
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -192,8 +209,8 @@ fun ProfileCardContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                IconButton(onClick = {  }) {
-                    Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                IconButton(onClick = {}) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                 }
                 Text("Profile", style = MaterialTheme.typography.titleLarge)
                 Button(
@@ -249,6 +266,25 @@ fun ProfileCardContent(
         }
     }
 }
+
+@Composable
+fun ProfileAvatar(url: String) {
+    val context = LocalContext.current
+    val imageModel = remember(url, context) {
+        coil.request.ImageRequest.Builder(context)
+            .data(url)
+            .crossfade(true)
+            .build()
+    }
+    AsyncImage(
+        model = imageModel,
+        contentDescription = "Avatar",
+        modifier = Modifier
+            .size(100.dp)
+            .clip(CircleShape)
+    )
+}
+
 @Composable
 fun ProfileHeader(state: ProfileUiState, onToggleFollow: () -> Unit) {
 
@@ -264,17 +300,7 @@ fun ProfileHeader(state: ProfileUiState, onToggleFollow: () -> Unit) {
                 .graphicsLayer(scaleX = scale, scaleY = scale)
         ) {
 
-            Icon(
-                Icons.Filled.Person,
-                contentDescription = "Profile",
-                modifier = Modifier
-                    .size(96.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFE0E0E0))
-                    .padding(16.dp),
-                tint = Color.DarkGray
-            )
-
+            ProfileAvatar("https://i.pravatar.cc/300")
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -286,12 +312,25 @@ fun ProfileHeader(state: ProfileUiState, onToggleFollow: () -> Unit) {
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Text(state.name, style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold))
+        val derivedName by remember(state.name) {
+            derivedStateOf { state.name }
+        }
+
+        val derivedBio by remember(state.bio) {
+            derivedStateOf { state.bio }
+        }
+
         Text(
-            state.bio,
+            derivedName,
+            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.SemiBold)
+        )
+
+        Text(
+            derivedBio,
             style = MaterialTheme.typography.bodyMedium,
             color = Color.Gray.copy(alpha = 0.8f)
         )
+
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -349,7 +388,10 @@ fun FollowersList(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(horizontal = 0.dp)
         ) {
-            items(followers.take(2)) { follower ->
+            items(
+                items = followers.take(2),
+                key = { follower -> follower.id }
+            ) { follower ->
                 AnimatedFollowerItem(follower, onFollowToggle)
             }
         }
@@ -415,7 +457,9 @@ fun AnimatedFollowerItem(
             Button(
                 onClick = { onFollowToggle(follower.id, !follower.isFollowing) },
                 shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.fillMaxWidth().height(36.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(36.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (follower.isFollowing) unfollowButtonColor else followButtonColor
                 ),
